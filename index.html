@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>∞ Waifu Gallery</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital@0;1&family=Space+Mono&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --card: #12121a;
+    --accent: #ff6b9d;
+    --accent2: #c084fc;
+    --text: #f0e6ff;
+    --muted: #6b6b8a;
+    --glow: rgba(255, 107, 157, 0.3);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    padding: 1.2rem 2rem;
+    background: rgba(10, 10, 15, 0.9);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255, 107, 157, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .logo {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 1.6rem;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .counter {
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  .counter span { color: var(--accent); font-weight: bold; }
+
+  .gallery {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .card {
+    width: 100%;
+    height: 100vh;
+    position: relative;
+    cursor: pointer;
+    opacity: 0;
+    animation: fadeIn 0.5s ease forwards;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+    overflow: hidden;
+  }
+
+  .card img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+  }
+
+  .card .overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(10,10,15,0.85) 0%, transparent 40%);
+    opacity: 0;
+    transition: opacity 0.3s;
+    display: flex;
+    align-items: flex-end;
+    padding: 2rem;
+  }
+
+  .card:hover .overlay { opacity: 1; }
+
+  .card .num {
+    font-size: 0.75rem;
+    color: var(--accent);
+    letter-spacing: 0.15em;
+  }
+
+  @keyframes fadeIn {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .spinner-wrap {
+    display: flex;
+    justify-content: center;
+    padding: 2.5rem;
+  }
+
+  .spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid rgba(255,107,157,0.2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .lightbox {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(0,0,0,0.93);
+    backdrop-filter: blur(12px);
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    cursor: zoom-out;
+  }
+
+  .lightbox.active { display: flex; }
+
+  .lightbox img {
+    max-width: 90vw;
+    max-height: 90vh;
+    border-radius: 10px;
+    box-shadow: 0 0 80px rgba(0,0,0,0.9), 0 0 40px var(--glow);
+    cursor: default;
+  }
+
+  .lightbox .close {
+    position: absolute;
+    top: 1.5rem;
+    right: 1.5rem;
+    font-size: 1.5rem;
+    color: var(--muted);
+    cursor: pointer;
+    background: none;
+    border: none;
+    transition: color 0.2s;
+  }
+
+  .lightbox .close:hover { color: var(--accent); }
+
+  @media (max-width: 600px) {
+    .card { height: 100svh; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">waifu∞</div>
+  <div class="counter">loaded <span id="count">0</span> images</div>
+</header>
+
+<div class="gallery" id="gallery"></div>
+<div class="spinner-wrap" id="spinnerWrap">
+  <div class="spinner"></div>
+</div>
+
+<div class="lightbox" id="lightbox">
+  <button class="close" id="lbClose">✕</button>
+  <img id="lbImg" src="" alt="">
+</div>
+
+<script>
+  const gallery = document.getElementById('gallery');
+  const countEl = document.getElementById('count');
+  const lightbox = document.getElementById('lightbox');
+  const lbImg = document.getElementById('lbImg');
+
+  let count = 0;
+  let loading = false;
+  const BATCH = 8;
+
+  async function fetchOne() {
+    try {
+      const res = await fetch('https://api.waifu.pics/nsfw/waifu');
+      const data = await res.json();
+      return data.url;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function createCard(url) {
+    count++;
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.style.animationDelay = ((count % BATCH) * 50) + 'ms';
+
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = '#' + count;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay';
+    const num = document.createElement('div');
+    num.className = 'num';
+    num.textContent = '#' + count;
+    overlay.appendChild(num);
+
+    card.appendChild(img);
+    card.appendChild(overlay);
+
+    card.addEventListener('click', () => {
+      lbImg.src = url;
+      lightbox.classList.add('active');
+    });
+
+    return card;
+  }
+
+  async function loadBatch() {
+    if (loading) return;
+    loading = true;
+
+    const promises = Array.from({ length: BATCH }, () => fetchOne());
+    const urls = await Promise.all(promises);
+
+    urls.forEach(url => {
+      if (url) gallery.appendChild(createCard(url));
+    });
+
+    countEl.textContent = count;
+    loading = false;
+
+    // After batch done, immediately check if page still not tall enough
+    setTimeout(checkAndLoad, 100);
+  }
+
+  function checkAndLoad() {
+    if (loading) return;
+    const scrollBottom = window.scrollY + window.innerHeight;
+    const docHeight = document.documentElement.scrollHeight;
+    if (docHeight - scrollBottom < 1000) {
+      loadBatch();
+    }
+  }
+
+  // Scroll listener - throttled
+  let scrollTimer;
+  window.addEventListener('scroll', () => {
+    if (scrollTimer) return;
+    scrollTimer = setTimeout(() => {
+      scrollTimer = null;
+      checkAndLoad();
+    }, 100);
+  }, { passive: true });
+
+  // Lightbox
+  lightbox.addEventListener('click', e => {
+    if (e.target === lightbox) lightbox.classList.remove('active');
+  });
+  document.getElementById('lbClose').addEventListener('click', () => lightbox.classList.remove('active'));
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') lightbox.classList.remove('active');
+  });
+
+  // Start: load 2 batches immediately to fill screen
+  loadBatch().then(() => loadBatch());
+</script>
+</body>
+</html>
